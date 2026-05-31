@@ -39,17 +39,18 @@ module "eks" {
   cluster_name    = var.cluster_name
   cluster_version = var.cluster_version
 
-  cluster_endpoint_public_access = true
+  cluster_endpoint_public_access       = true
+  enable_cluster_creator_admin_permissions = true
 
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
   eks_managed_node_groups = {
     default = {
-      instance_types = ["t3.medium"]
+      instance_types = ["t3.small"]
       min_size       = 1
-      max_size       = 3
-      desired_size   = 2
+      max_size       = 2
+      desired_size   = 1
     }
   }
 }
@@ -77,6 +78,7 @@ resource "helm_release" "ingress_nginx" {
   chart            = "ingress-nginx"
   namespace        = "ingress-nginx"
   create_namespace = true
+  timeout          = 600
 
   values = [file("${path.module}/helm-values/ingress-nginx.yaml")]
 
@@ -99,21 +101,6 @@ resource "helm_release" "argocd" {
   depends_on = [module.eks]
 }
 
-# ==========================================
-# Helm: Prometheus + Grafana
-# ==========================================
-
-resource "helm_release" "prometheus_stack" {
-  name             = "kube-prometheus-stack"
-  repository       = "https://prometheus-community.github.io/helm-charts"
-  chart            = "kube-prometheus-stack"
-  namespace        = "monitoring"
-  create_namespace = true
-
-  set {
-    name  = "grafana.adminPassword"
-    value = "prom-operator"
-  }
-
-  depends_on = [module.eks]
-}
+# Prometheus stack removed from Terraform — deploy manually in Step 7
+# helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+#   -n monitoring --create-namespace --set grafana.adminPassword=prom-operator

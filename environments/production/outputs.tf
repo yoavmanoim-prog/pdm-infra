@@ -18,3 +18,8 @@ output "vpc_id" {
   description = "VPC ID"
   value       = module.pdm_env.vpc_id
 }
+
+output "github_actions_role_arn" {
+  description = "IAM role ARN to set as ACTIONS_ROLE_ARN secret in pdm-app"
+  value       = aws_iam_role.github_actions.arn
+}
