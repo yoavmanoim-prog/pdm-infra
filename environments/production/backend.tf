@@ -1,1 +1,3 @@
-# Remote state backend (e.g. S3)
+terraform {
+  backend "s3" {}
+}

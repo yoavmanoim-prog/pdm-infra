@@ -1,0 +1,10 @@
+server:
+  service:
+    type: ClusterIP
+  # Disable TLS so ingress-nginx can terminate it
+  extraArgs:
+    - --insecure
+
+configs:
+  params:
+    server.insecure: "true"
