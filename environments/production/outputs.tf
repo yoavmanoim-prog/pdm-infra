@@ -20,6 +20,16 @@ output "vpc_id" {
 }
 
 output "github_actions_role_arn" {
-  description = "IAM role ARN to set as ACTIONS_ROLE_ARN secret in pdm-app"
+  description = "IAM role ARN to set as AWS_ROLE_ARN secret in pdm-app"
   value       = aws_iam_role.github_actions.arn
+}
+
+output "oidc_provider_arn" {
+  description = "EKS OIDC provider ARN — used when creating IRSA roles for pods"
+  value       = module.pdm_env.oidc_provider_arn
+}
+
+output "oidc_provider_url" {
+  description = "EKS OIDC provider URL"
+  value       = module.pdm_env.oidc_provider_url
 }

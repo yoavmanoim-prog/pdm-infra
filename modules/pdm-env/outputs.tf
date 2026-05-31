@@ -17,3 +17,13 @@ output "vpc_id" {
   description = "VPC ID"
   value       = module.vpc.vpc_id
 }
+
+output "oidc_provider_arn" {
+  description = "ARN of the EKS OIDC provider — used to create IRSA roles"
+  value       = module.eks.oidc_provider_arn
+}
+
+output "oidc_provider_url" {
+  description = "URL of the EKS OIDC provider"
+  value       = module.eks.cluster_oidc_issuer_url
+}
