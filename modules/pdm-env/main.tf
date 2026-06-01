@@ -105,3 +105,82 @@ resource "helm_release" "argocd" {
 # Prometheus stack removed from Terraform — deploy manually in Step 7
 # helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
 #   -n monitoring --create-namespace --set grafana.adminPassword=prom-operator
+
+# ==========================================
+# S3 — PDF storage
+# ==========================================
+
+resource "aws_s3_bucket" "pdm_docs" {
+  bucket = "pdm-docs-${var.environment}"
+}
+
+resource "aws_s3_bucket_versioning" "pdm_docs" {
+  bucket = aws_s3_bucket.pdm_docs.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "pdm_docs" {
+  bucket = aws_s3_bucket.pdm_docs.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "pdm_docs" {
+  bucket                  = aws_s3_bucket.pdm_docs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# ==========================================
+# IRSA — backend pod S3 access
+# ==========================================
+
+resource "aws_iam_role" "pdm_backend" {
+  name = "pdm-backend-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Federated = module.eks.oidc_provider_arn
+      }
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "${module.eks.cluster_oidc_issuer_url}:sub" = "system:serviceaccount:pdm-production:pdm-backend"
+          "${module.eks.cluster_oidc_issuer_url}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "pdm_backend_s3" {
+  name = "pdm-backend-s3"
+  role = aws_iam_role.pdm_backend.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ]
+      Resource = [
+        aws_s3_bucket.pdm_docs.arn,
+        "${aws_s3_bucket.pdm_docs.arn}/*"
+      ]
+    }]
+  })
+}

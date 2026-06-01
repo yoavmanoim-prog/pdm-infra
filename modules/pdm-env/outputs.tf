@@ -27,3 +27,13 @@ output "oidc_provider_url" {
   description = "URL of the EKS OIDC provider"
   value       = module.eks.cluster_oidc_issuer_url
 }
+
+output "s3_bucket_name" {
+  description = "S3 bucket name for PDF storage"
+  value       = aws_s3_bucket.pdm_docs.bucket
+}
+
+output "backend_irsa_role_arn" {
+  description = "IAM role ARN for the backend pod (IRSA) — annotate the ServiceAccount with this"
+  value       = aws_iam_role.pdm_backend.arn
+}

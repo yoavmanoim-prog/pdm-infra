@@ -33,3 +33,13 @@ output "oidc_provider_url" {
   description = "EKS OIDC provider URL"
   value       = module.pdm_env.oidc_provider_url
 }
+
+output "s3_bucket_name" {
+  description = "S3 bucket name for PDF storage"
+  value       = module.pdm_env.s3_bucket_name
+}
+
+output "backend_irsa_role_arn" {
+  description = "IAM role ARN to annotate the backend ServiceAccount with"
+  value       = module.pdm_env.backend_irsa_role_arn
+}
