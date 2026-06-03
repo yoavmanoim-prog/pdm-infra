@@ -174,6 +174,61 @@ resource "helm_release" "argocd" {
 #   -n monitoring --create-namespace --set grafana.adminPassword=prom-operator
 
 # ==========================================
+# RDS — Managed PostgreSQL
+# ==========================================
+
+# Security group — controls who can connect to the RDS instance
+# Only allows traffic from inside the VPC (the EKS nodes)
+resource "aws_security_group" "rds" {
+  name        = "${var.cluster_name}-rds"
+  description = "Allow postgres access from EKS nodes"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [module.vpc.vpc_cidr_block] # only allow connections from within the VPC
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+# Subnet group — tells RDS which subnets it can use (must span multiple AZs)
+resource "aws_db_subnet_group" "pdm" {
+  name       = "${var.cluster_name}-rds"
+  subnet_ids = module.vpc.private_subnets
+}
+
+# The RDS instance itself
+resource "aws_db_instance" "pdm" {
+  identifier        = "${var.cluster_name}-postgres"
+  engine            = "postgres"
+  engine_version    = "16"
+  instance_class    = "db.t3.micro" # smallest instance — good enough for this project
+  allocated_storage = 20            # 20GB disk
+
+  db_name  = "pdm"
+  username = "pdm"
+  password = var.db_password # passed in via tfvars — never hardcoded
+
+  db_subnet_group_name   = aws_db_subnet_group.pdm.name
+  vpc_security_group_ids = [aws_security_group.rds.id]
+
+  skip_final_snapshot = true  # allows destroy without a final backup (fine for dev)
+  publicly_accessible = false # not accessible from the internet — only from within the VPC
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+# ==========================================
 # S3 — PDF storage
 # ==========================================
 

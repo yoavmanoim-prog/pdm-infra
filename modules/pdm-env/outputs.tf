@@ -37,3 +37,8 @@ output "backend_irsa_role_arn" {
   description = "IAM role ARN for the backend pod (IRSA) — annotate the ServiceAccount with this"
   value       = aws_iam_role.pdm_backend.arn
 }
+
+output "rds_endpoint" {
+  description = "RDS postgres endpoint — use this in DATABASE_URL"
+  value       = aws_db_instance.pdm.endpoint
+}
