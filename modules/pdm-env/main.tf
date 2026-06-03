@@ -180,7 +180,7 @@ resource "helm_release" "argocd" {
 # Security group — controls who can connect to the RDS instance
 # Only allows traffic from inside the VPC (the EKS nodes)
 resource "aws_security_group" "rds" {
-  name        = "${var.cluster_name}-rds"
+  name        = "${lower(var.cluster_name)}-rds"  # lowercase because RDS doesn't allow uppercase
   description = "Allow postgres access from EKS nodes"
   vpc_id      = module.vpc.vpc_id
 
@@ -201,13 +201,13 @@ resource "aws_security_group" "rds" {
 
 # Subnet group — tells RDS which subnets it can use (must span multiple AZs)
 resource "aws_db_subnet_group" "pdm" {
-  name       = "${var.cluster_name}-rds"
+  name       = "${lower(var.cluster_name)}-rds"  # lowercase required
   subnet_ids = module.vpc.private_subnets
 }
 
 # The RDS instance itself
 resource "aws_db_instance" "pdm" {
-  identifier        = "${var.cluster_name}-postgres"
+  identifier        = "${lower(var.cluster_name)}-postgres"  # lowercase required for RDS identifiers
   engine            = "postgres"
   engine_version    = "16"
   instance_class    = "db.t3.micro" # smallest instance — good enough for this project
