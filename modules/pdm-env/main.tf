@@ -50,10 +50,77 @@ module "eks" {
     default = {
       instance_types = ["t3.small"]
       min_size       = 1
-      max_size       = 3
-      desired_size   = 2
+      max_size       = 4
+      desired_size   = 3
     }
   }
+}
+
+# ==========================================
+# Node Auto Scaling (CloudWatch + ASG)
+# ==========================================
+
+data "aws_autoscaling_groups" "eks_nodes" {
+  filter {
+    name   = "tag:eks:cluster-name"
+    values = [var.cluster_name]
+  }
+
+  depends_on = [module.eks]
+}
+
+resource "aws_autoscaling_policy" "scale_out" {
+  name                   = "${var.cluster_name}-scale-out"
+  autoscaling_group_name = data.aws_autoscaling_groups.eks_nodes.names[0]
+  policy_type            = "SimpleScaling"
+  adjustment_type        = "ChangeInCapacity"
+  scaling_adjustment     = 1
+  cooldown               = 300
+}
+
+resource "aws_autoscaling_policy" "scale_in" {
+  name                   = "${var.cluster_name}-scale-in"
+  autoscaling_group_name = data.aws_autoscaling_groups.eks_nodes.names[0]
+  policy_type            = "SimpleScaling"
+  adjustment_type        = "ChangeInCapacity"
+  scaling_adjustment     = -1
+  cooldown               = 300
+}
+
+resource "aws_cloudwatch_metric_alarm" "scale_out" {
+  alarm_name          = "${var.cluster_name}-nodes-scale-out"
+  alarm_description   = "Add a node when average CPU exceeds 70%"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  statistic           = "Average"
+  period              = 60
+  evaluation_periods  = 2
+  threshold           = 70
+  comparison_operator = "GreaterThanThreshold"
+
+  dimensions = {
+    AutoScalingGroupName = data.aws_autoscaling_groups.eks_nodes.names[0]
+  }
+
+  alarm_actions = [aws_autoscaling_policy.scale_out.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "scale_in" {
+  alarm_name          = "${var.cluster_name}-nodes-scale-in"
+  alarm_description   = "Remove a node when average CPU drops below 30%"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  statistic           = "Average"
+  period              = 60
+  evaluation_periods  = 10
+  threshold           = 30
+  comparison_operator = "LessThanThreshold"
+
+  dimensions = {
+    AutoScalingGroupName = data.aws_autoscaling_groups.eks_nodes.names[0]
+  }
+
+  alarm_actions = [aws_autoscaling_policy.scale_in.arn]
 }
 
 # ==========================================
