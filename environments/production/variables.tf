@@ -14,3 +14,9 @@ variable "cluster_version" {
   type        = string
   default     = "1.30"
 }
+
+variable "db_password" {
+  description = "Master password for the RDS postgres instance"
+  type        = string
+  sensitive   = true # Terraform will never print this value in logs
+}
