@@ -67,7 +67,11 @@ resource "aws_iam_policy" "github_actions_ecr" {
           "ecr:CompleteLayerUpload",
           "ecr:DescribeRepositories"
         ]
-        Resource = "arn:aws:ecr:${var.aws_region}:${data.aws_caller_identity.current.account_id}:repository/pdm-backend"
+        # allow push to both backend and frontend ECR repositories
+        Resource = [
+          "arn:aws:ecr:${var.aws_region}:${data.aws_caller_identity.current.account_id}:repository/pdm-backend",
+          "arn:aws:ecr:${var.aws_region}:${data.aws_caller_identity.current.account_id}:repository/pdm-frontend"
+        ]
       }
     ]
   })
