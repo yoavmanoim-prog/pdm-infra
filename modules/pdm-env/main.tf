@@ -107,12 +107,12 @@ resource "aws_cloudwatch_metric_alarm" "scale_out" {
 
 resource "aws_cloudwatch_metric_alarm" "scale_in" {
   alarm_name          = "${var.cluster_name}-nodes-scale-in"
-  alarm_description   = "Remove a node when average CPU drops below 30%"
+  alarm_description   = "Remove a node when average CPU drops below 30% for 20 minutes"
   metric_name         = "CPUUtilization"
   namespace           = "AWS/EC2"
   statistic           = "Average"
   period              = 60
-  evaluation_periods  = 10
+  evaluation_periods  = 20
   threshold           = 30
   comparison_operator = "LessThanThreshold"
 
