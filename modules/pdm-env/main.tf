@@ -49,9 +49,9 @@ module "eks" {
   eks_managed_node_groups = {
     default = {
       instance_types = ["t3.small"]
-      min_size       = 3
+      min_size       = 4
       max_size       = 5
-      desired_size   = 3
+      desired_size   = 4
     }
   }
 }
