@@ -48,10 +48,10 @@ module "eks" {
 
   eks_managed_node_groups = {
     default = {
-      instance_types = ["t3.small"]
-      min_size       = 4
-      max_size       = 5
-      desired_size   = 4
+      instance_types = ["t3.medium"]
+      min_size       = 1
+      max_size       = 3
+      desired_size   = 2
     }
   }
 }
@@ -178,17 +178,18 @@ resource "helm_release" "argocd" {
 # ==========================================
 
 # Security group — controls who can connect to the RDS instance
-# Only allows traffic from inside the VPC (the EKS nodes)
+# Allows traffic only from the EKS node security group, not the whole VPC
 resource "aws_security_group" "rds" {
   name        = "${lower(var.cluster_name)}-rds"  # lowercase because RDS doesn't allow uppercase
-  description = "Allow postgres access from EKS nodes"
+  description = "Allow postgres access from EKS nodes only"
   vpc_id      = module.vpc.vpc_id
 
   ingress {
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
-    cidr_blocks = [module.vpc.vpc_cidr_block] # only allow connections from within the VPC
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    # reference the EKS node security group directly — only cluster nodes can reach RDS
+    security_groups = [module.eks.node_security_group_id]
   }
 
   egress {
