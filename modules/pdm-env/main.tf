@@ -43,6 +43,19 @@ module "eks" {
   enable_cluster_creator_admin_permissions = true
   enable_irsa                              = true
 
+  # allow port 80 between nodes — the default rule only opens 1025-65535
+  # which blocks nginx pods (port 80) from being reached cross-node
+  node_security_group_additional_rules = {
+    ingress_node_port_80 = {
+      description                = "Node to node port 80"
+      protocol                   = "tcp"
+      from_port                  = 80
+      to_port                    = 80
+      type                       = "ingress"
+      source_node_security_group = true
+    }
+  }
+
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
