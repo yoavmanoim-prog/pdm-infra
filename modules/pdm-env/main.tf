@@ -242,8 +242,7 @@ resource "helm_release" "elasticsearch" {
   values = [<<-YAML
     replicas: 1
     minimumMasterNodes: 1
-    # disable xpack security — not needed for this project, and it adds
-    # TLS/certificate complexity that causes startup failures on small nodes
+    # disable xpack security — not needed for this project
     esConfig:
       elasticsearch.yml: |
         xpack.security.enabled: false
@@ -253,6 +252,12 @@ resource "helm_release" "elasticsearch" {
         memory: "1Gi"
       limits:
         memory: "2Gi"
+    # explicitly set the storage class so the PVC is not left unbound
+    volumeClaimTemplate:
+      storageClassName: gp2
+      resources:
+        requests:
+          storage: 10Gi
   YAML
   ]
 
