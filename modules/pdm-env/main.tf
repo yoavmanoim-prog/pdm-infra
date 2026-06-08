@@ -236,11 +236,18 @@ resource "helm_release" "elasticsearch" {
   chart            = "elasticsearch"
   namespace        = "logging"
   create_namespace = true
-  version          = "8.5.1" # pin for deterministic plans
+  version          = "8.5.1"
+  timeout          = 900 # ES 8.x is slow to start — default 300s is not enough
 
   values = [<<-YAML
     replicas: 1
     minimumMasterNodes: 1
+    # disable xpack security — not needed for this project, and it adds
+    # TLS/certificate complexity that causes startup failures on small nodes
+    esConfig:
+      elasticsearch.yml: |
+        xpack.security.enabled: false
+        xpack.security.http.ssl.enabled: false
     resources:
       requests:
         memory: "1Gi"
@@ -291,9 +298,9 @@ resource "aws_security_group" "rds" {
   vpc_id      = module.vpc.vpc_id
 
   ingress {
-    from_port       = 5432
-    to_port         = 5432
-    protocol        = "tcp"
+    from_port = 5432
+    to_port   = 5432
+    protocol  = "tcp"
     # reference the EKS node security group directly — only cluster nodes can reach RDS
     security_groups = [module.eks.node_security_group_id]
   }
