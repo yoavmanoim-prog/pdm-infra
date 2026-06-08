@@ -236,19 +236,13 @@ resource "helm_release" "elasticsearch" {
   chart            = "elasticsearch"
   namespace        = "logging"
   create_namespace = true
-  version          = "8.5.1"
-  timeout          = 900 # ES 8.x is slow to start — default 300s is not enough
+  # 7.17.x uses HTTP by default — no auto-SSL bootstrap that overrides config
+  version = "7.17.3"
+  timeout = 600
 
   values = [<<-YAML
     replicas: 1
     minimumMasterNodes: 1
-    # disable xpack security — not needed for this project
-    esConfig:
-      elasticsearch.yml: |
-        xpack.security.enabled: false
-        xpack.security.http.ssl.enabled: false
-    # no persistent volume — logs live in pod memory only
-    # avoids EBS AZ scheduling conflicts on a small cluster
     persistence:
       enabled: false
     resources:
@@ -267,20 +261,11 @@ resource "helm_release" "kibana" {
   repository = "https://helm.elastic.co"
   chart      = "kibana"
   namespace  = "logging"
-  version    = "8.5.1"
+  version    = "7.17.3"
   timeout    = 600
 
   values = [<<-YAML
     elasticsearchHosts: "http://elasticsearch-master:9200"
-    protocol: http
-    # remove the default secretMount for kibana-kibana-es-token —
-    # that secret is created by the pre-install enrollment hook which
-    # we bypass; without this the pod fails with "secret not found"
-    secretMounts: []
-    kibanaConfig:
-      kibana.yml: |
-        xpack.security.enabled: false
-        elasticsearch.hosts: ["http://elasticsearch-master:9200"]
   YAML
   ]
 
