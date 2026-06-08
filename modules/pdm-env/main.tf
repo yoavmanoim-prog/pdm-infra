@@ -268,9 +268,16 @@ resource "helm_release" "kibana" {
   chart      = "kibana"
   namespace  = "logging"
   version    = "8.5.1"
+  timeout    = 600
 
   values = [<<-YAML
     elasticsearchHosts: "http://elasticsearch-master:9200"
+    # match the ES security-disabled setup — use plain HTTP
+    protocol: http
+    kibanaConfig:
+      kibana.yml: |
+        xpack.security.enabled: false
+        elasticsearch.hosts: ["http://elasticsearch-master:9200"]
   YAML
   ]
 
