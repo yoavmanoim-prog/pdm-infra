@@ -49,9 +49,9 @@ module "eks" {
   eks_managed_node_groups = {
     default = {
       instance_types = ["t3.medium"]
-      min_size       = 1
-      max_size       = 3
-      desired_size   = 2
+      min_size       = 2
+      max_size       = 4
+      desired_size   = 3
     }
   }
 }
@@ -247,9 +247,9 @@ resource "helm_release" "elasticsearch" {
       enabled: false
     resources:
       requests:
-        memory: "512Mi"
+        memory: "256Mi"
       limits:
-        memory: "1Gi"
+        memory: "512Mi"
   YAML
   ]
 
