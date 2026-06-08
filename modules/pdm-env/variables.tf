@@ -30,3 +30,4 @@ variable "db_password" {
   type        = string
   sensitive   = true # marks it as sensitive so Terraform never prints it in logs
 }
+

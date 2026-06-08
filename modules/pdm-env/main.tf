@@ -136,6 +136,16 @@ resource "aws_ecr_repository" "pdm_backend" {
   }
 }
 
+# Frontend ECR — CI (ci-backend.yml) pushes pdm-frontend images here
+resource "aws_ecr_repository" "pdm_frontend" {
+  name                 = "pdm-frontend"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+}
+
 # ==========================================
 # Helm: ingress-nginx
 # ==========================================
@@ -169,9 +179,105 @@ resource "helm_release" "argocd" {
   depends_on = [module.eks]
 }
 
-# Prometheus stack removed from Terraform — deploy manually in Step 7
-# helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-#   -n monitoring --create-namespace --set grafana.adminPassword=prom-operator
+# ==========================================
+# Helm: kube-prometheus-stack
+# Installs Prometheus, Grafana, and Alertmanager in one chart.
+# Overrides in helm-values/kube-prometheus-stack.yaml configure:
+#   - Alertmanager Slack receiver
+#   - ServiceMonitor discovery for pdm-backend
+#   - Grafana admin password (set via variable so it is never hardcoded)
+# ==========================================
+
+# Read secrets from AWS Secrets Manager — Terraform accesses these using
+# the OIDC role assumed by CI, so no credentials are ever stored in code.
+# Before running terraform apply, create these two secrets in AWS:
+#   pdm/grafana/admin-password
+#   pdm/alertmanager/slack-webhook-url
+data "aws_secretsmanager_secret_version" "grafana_password" {
+  secret_id = "pdm/grafana/admin-password"
+}
+
+data "aws_secretsmanager_secret_version" "slack_webhook_url" {
+  secret_id = "pdm/alertmanager/slack-webhook-url"
+}
+
+resource "helm_release" "prometheus_stack" {
+  name             = "kube-prometheus-stack"
+  repository       = "https://prometheus-community.github.io/helm-charts"
+  chart            = "kube-prometheus-stack"
+  namespace        = "monitoring"
+  create_namespace = true
+  version          = "61.3.2"   # pin so terraform plan is deterministic
+
+  values = [
+    templatefile("${path.module}/helm-values/kube-prometheus-stack.yaml", {
+      # values injected from Secrets Manager — never written to disk
+      slack_webhook_url = data.aws_secretsmanager_secret_version.slack_webhook_url.secret_string
+      grafana_password  = data.aws_secretsmanager_secret_version.grafana_password.secret_string
+    })
+  ]
+
+  depends_on = [module.eks]
+}
+
+# ==========================================
+# Helm: ELK stack — centralised logging
+#
+# Three components, each its own helm_release:
+#   Elasticsearch — stores and indexes every log line shipped to it
+#   Kibana        — web UI for searching and filtering logs
+#   Fluent Bit    — DaemonSet that runs on every node, reads pod logs
+#                   from /var/log/containers and forwards them to ES
+# ==========================================
+
+resource "helm_release" "elasticsearch" {
+  name             = "elasticsearch"
+  repository       = "https://helm.elastic.co"
+  chart            = "elasticsearch"
+  namespace        = "logging"
+  create_namespace = true
+  version          = "8.5.1"   # pin for deterministic plans
+
+  values = [<<-YAML
+    replicas: 1
+    minimumMasterNodes: 1
+    resources:
+      requests:
+        memory: "1Gi"
+      limits:
+        memory: "2Gi"
+  YAML
+  ]
+
+  depends_on = [module.eks]
+}
+
+resource "helm_release" "kibana" {
+  name       = "kibana"
+  repository = "https://helm.elastic.co"
+  chart      = "kibana"
+  namespace  = "logging"
+  version    = "8.5.1"
+
+  values = [<<-YAML
+    elasticsearchHosts: "http://elasticsearch-master:9200"
+  YAML
+  ]
+
+  depends_on = [helm_release.elasticsearch]
+}
+
+resource "helm_release" "fluent_bit" {
+  name             = "fluent-bit"
+  repository       = "https://fluent.github.io/helm-charts"
+  chart            = "fluent-bit"
+  namespace        = "logging"
+  version          = "0.46.7"
+
+  values = [file("${path.module}/helm-values/fluent-bit.yaml")]
+
+  depends_on = [helm_release.elasticsearch]
+}
 
 # ==========================================
 # RDS — Managed PostgreSQL
