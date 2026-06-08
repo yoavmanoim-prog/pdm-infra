@@ -247,17 +247,15 @@ resource "helm_release" "elasticsearch" {
       elasticsearch.yml: |
         xpack.security.enabled: false
         xpack.security.http.ssl.enabled: false
+    # no persistent volume — logs live in pod memory only
+    # avoids EBS AZ scheduling conflicts on a small cluster
+    persistence:
+      enabled: false
     resources:
       requests:
-        memory: "1Gi"
+        memory: "512Mi"
       limits:
-        memory: "2Gi"
-    # explicitly set the storage class so the PVC is not left unbound
-    volumeClaimTemplate:
-      storageClassName: gp2
-      resources:
-        requests:
-          storage: 10Gi
+        memory: "1Gi"
   YAML
   ]
 
