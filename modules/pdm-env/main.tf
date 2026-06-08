@@ -207,7 +207,7 @@ resource "helm_release" "prometheus_stack" {
   chart            = "kube-prometheus-stack"
   namespace        = "monitoring"
   create_namespace = true
-  version          = "61.3.2"   # pin so terraform plan is deterministic
+  version          = "61.3.2" # pin so terraform plan is deterministic
 
   values = [
     templatefile("${path.module}/helm-values/kube-prometheus-stack.yaml", {
@@ -236,7 +236,7 @@ resource "helm_release" "elasticsearch" {
   chart            = "elasticsearch"
   namespace        = "logging"
   create_namespace = true
-  version          = "8.5.1"   # pin for deterministic plans
+  version          = "8.5.1" # pin for deterministic plans
 
   values = [<<-YAML
     replicas: 1
@@ -268,11 +268,11 @@ resource "helm_release" "kibana" {
 }
 
 resource "helm_release" "fluent_bit" {
-  name             = "fluent-bit"
-  repository       = "https://fluent.github.io/helm-charts"
-  chart            = "fluent-bit"
-  namespace        = "logging"
-  version          = "0.46.7"
+  name       = "fluent-bit"
+  repository = "https://fluent.github.io/helm-charts"
+  chart      = "fluent-bit"
+  namespace  = "logging"
+  version    = "0.46.7"
 
   values = [file("${path.module}/helm-values/fluent-bit.yaml")]
 
@@ -286,7 +286,7 @@ resource "helm_release" "fluent_bit" {
 # Security group — controls who can connect to the RDS instance
 # Only allows traffic from inside the VPC (the EKS nodes)
 resource "aws_security_group" "rds" {
-  name        = "${lower(var.cluster_name)}-rds"  # lowercase because RDS doesn't allow uppercase
+  name        = "${lower(var.cluster_name)}-rds" # lowercase because RDS doesn't allow uppercase
   description = "Allow postgres access from EKS nodes"
   vpc_id      = module.vpc.vpc_id
 
@@ -307,13 +307,13 @@ resource "aws_security_group" "rds" {
 
 # Subnet group — tells RDS which subnets it can use (must span multiple AZs)
 resource "aws_db_subnet_group" "pdm" {
-  name       = "${lower(var.cluster_name)}-rds"  # lowercase required
+  name       = "${lower(var.cluster_name)}-rds" # lowercase required
   subnet_ids = module.vpc.private_subnets
 }
 
 # The RDS instance itself
 resource "aws_db_instance" "pdm" {
-  identifier        = "${lower(var.cluster_name)}-postgres"  # lowercase required for RDS identifiers
+  identifier        = "${lower(var.cluster_name)}-postgres" # lowercase required for RDS identifiers
   engine            = "postgres"
   engine_version    = "16"
   instance_class    = "db.t3.micro" # smallest instance — good enough for this project
