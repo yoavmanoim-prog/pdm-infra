@@ -402,8 +402,9 @@ resource "aws_iam_role" "pdm_backend" {
       Action = "sts:AssumeRoleWithWebIdentity"
       Condition = {
         StringEquals = {
-          "${module.eks.cluster_oidc_issuer_url}:sub" = "system:serviceaccount:pdm-production:pdm-backend"
-          "${module.eks.cluster_oidc_issuer_url}:aud" = "sts.amazonaws.com"
+          # IAM condition keys use the OIDC issuer WITHOUT the https:// prefix
+          "${trimprefix(module.eks.cluster_oidc_issuer_url, "https://")}:sub" = "system:serviceaccount:pdm-production:pdm-backend"
+          "${trimprefix(module.eks.cluster_oidc_issuer_url, "https://")}:aud" = "sts.amazonaws.com"
         }
       }
     }]
