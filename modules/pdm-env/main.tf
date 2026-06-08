@@ -272,8 +272,11 @@ resource "helm_release" "kibana" {
 
   values = [<<-YAML
     elasticsearchHosts: "http://elasticsearch-master:9200"
-    # match the ES security-disabled setup — use plain HTTP
     protocol: http
+    # remove the default secretMount for kibana-kibana-es-token —
+    # that secret is created by the pre-install enrollment hook which
+    # we bypass; without this the pod fails with "secret not found"
+    secretMounts: []
     kibanaConfig:
       kibana.yml: |
         xpack.security.enabled: false
