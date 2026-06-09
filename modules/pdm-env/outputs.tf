@@ -42,3 +42,18 @@ output "rds_endpoint" {
   description = "RDS postgres endpoint — use this in DATABASE_URL"
   value       = aws_db_instance.pdm.endpoint
 }
+
+output "cloudfront_domain" {
+  description = "CloudFront distribution domain — open this URL in your browser"
+  value       = aws_cloudfront_distribution.pdm_frontend.domain_name
+}
+
+output "frontend_bucket_name" {
+  description = "S3 bucket that holds the built React files"
+  value       = aws_s3_bucket.pdm_frontend.bucket
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID — used for cache invalidation in CI"
+  value       = aws_cloudfront_distribution.pdm_frontend.id
+}

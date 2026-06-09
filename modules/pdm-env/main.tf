@@ -386,6 +386,152 @@ resource "aws_s3_bucket_public_access_block" "pdm_docs" {
 }
 
 # ==========================================
+# S3 — Frontend static files
+# ==========================================
+
+resource "aws_s3_bucket" "pdm_frontend" {
+  bucket = "pdm-frontend-${var.environment}"
+}
+
+resource "aws_s3_bucket_public_access_block" "pdm_frontend" {
+  bucket                  = aws_s3_bucket.pdm_frontend.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# OAC lets CloudFront read the bucket without making it public
+resource "aws_cloudfront_origin_access_control" "pdm_frontend" {
+  name                              = "pdm-frontend-${var.environment}"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+# Only CloudFront may read objects — bucket is otherwise private
+resource "aws_s3_bucket_policy" "pdm_frontend" {
+  bucket = aws_s3_bucket.pdm_frontend.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "cloudfront.amazonaws.com" }
+      Action    = "s3:GetObject"
+      Resource  = "${aws_s3_bucket.pdm_frontend.arn}/*"
+      Condition = {
+        StringEquals = {
+          "AWS:SourceArn" = aws_cloudfront_distribution.pdm_frontend.arn
+        }
+      }
+    }]
+  })
+  depends_on = [aws_cloudfront_distribution.pdm_frontend]
+}
+
+# Look up the ELB that the nginx ingress controller created
+data "aws_lb" "nginx_ingress" {
+  tags = {
+    "kubernetes.io/service-name" = "ingress-nginx/ingress-nginx-controller"
+  }
+  depends_on = [helm_release.ingress_nginx]
+}
+
+# ==========================================
+# CloudFront — serves frontend + proxies API
+# ==========================================
+
+resource "aws_cloudfront_distribution" "pdm_frontend" {
+  enabled             = true
+  default_root_object = "index.html"
+  price_class         = "PriceClass_100" # US/Europe edge locations only — cheapest tier
+
+  # Origin 1: S3 bucket (React static files)
+  origin {
+    domain_name              = aws_s3_bucket.pdm_frontend.bucket_regional_domain_name
+    origin_id                = "s3-frontend"
+    origin_access_control_id = aws_cloudfront_origin_access_control.pdm_frontend.id
+  }
+
+  # Origin 2: nginx ingress ELB (FastAPI backend)
+  origin {
+    domain_name = data.aws_lb.nginx_ingress.dns_name
+    origin_id   = "elb-backend"
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "http-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
+  # Default behavior: serve frontend files from S3
+  default_cache_behavior {
+    target_origin_id       = "s3-frontend"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+
+    forwarded_values {
+      query_string = false
+      cookies { forward = "none" }
+    }
+
+    min_ttl     = 0
+    default_ttl = 3600
+    max_ttl     = 86400
+  }
+
+  # /api/* behavior: proxy to backend — never cache, forward everything
+  ordered_cache_behavior {
+    path_pattern           = "/api/*"
+    target_origin_id       = "elb-backend"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+
+    forwarded_values {
+      query_string = true
+      headers      = ["Authorization", "Content-Type", "Accept", "Origin"]
+      cookies { forward = "all" }
+    }
+
+    # TTL 0 — never cache API responses
+    min_ttl     = 0
+    default_ttl = 0
+    max_ttl     = 0
+  }
+
+  # SPA routing: S3 returns 403/404 for unknown paths → serve index.html
+  # so React Router can handle the route on the client side
+  custom_error_response {
+    error_code         = 403
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
+  custom_error_response {
+    error_code         = 404
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
+  restrictions {
+    geo_restriction { restriction_type = "none" }
+  }
+
+  viewer_certificate {
+    cloudfront_default_certificate = true # free *.cloudfront.net certificate
+  }
+
+  tags = {
+    Environment = var.environment
+  }
+}
+
+# ==========================================
 # IRSA — backend pod S3 access
 # ==========================================
 
