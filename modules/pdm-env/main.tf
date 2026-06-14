@@ -62,9 +62,12 @@ module "eks" {
   eks_managed_node_groups = {
     default = {
       instance_types = ["t3.medium"]
-      min_size       = 2
-      max_size       = 4
-      desired_size   = 3
+      # min_size 3: the workload (ELK + monitoring + argocd + ESO + 3 app envs) needs
+      # 3 nodes; with min_size 2 the CPU-based scale-in policy kept dropping to 2 and
+      # starved pods (cert-controller, Elasticsearch, dev). Floor at 3 so it sticks.
+      min_size     = 3
+      max_size     = 4
+      desired_size = 3
     }
   }
 }
