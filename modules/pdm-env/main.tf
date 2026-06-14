@@ -193,6 +193,36 @@ resource "helm_release" "argocd" {
 }
 
 # ==========================================
+# Helm: External Secrets Operator
+# Installs the ESO controller + CRDs. The controller ServiceAccount is annotated
+# with the IRSA role (see aws_iam_role.external_secrets) so it can read pdm/*
+# secrets from Secrets Manager. The ClusterSecretStore and the per-app
+# ExternalSecrets live in gitops / the backend Helm chart.
+# ==========================================
+
+resource "helm_release" "external_secrets" {
+  name             = "external-secrets"
+  repository       = "https://charts.external-secrets.io"
+  chart            = "external-secrets"
+  namespace        = "external-secrets"
+  create_namespace = true
+  # not version-pinned (consistent with the argocd/ingress releases above) —
+  # pin to a known-good chart version once confirmed for reproducible plans.
+
+  values = [yamlencode({
+    installCRDs = true
+    # bind the controller's ServiceAccount to the IRSA role that can read pdm/*
+    serviceAccount = {
+      annotations = {
+        "eks.amazonaws.com/role-arn" = aws_iam_role.external_secrets.arn
+      }
+    }
+  })]
+
+  depends_on = [module.eks]
+}
+
+# ==========================================
 # Helm: kube-prometheus-stack
 # Installs Prometheus, Grafana, and Alertmanager in one chart.
 # Overrides in helm-values/kube-prometheus-stack.yaml configure:
