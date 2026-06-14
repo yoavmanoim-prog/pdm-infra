@@ -48,3 +48,18 @@ output "external_secrets_role_arn" {
   description = "IAM role ARN to annotate the external-secrets controller ServiceAccount with"
   value       = module.pdm_env.external_secrets_role_arn
 }
+
+output "cloudfront_domain" {
+  description = "CloudFront URL — open this in your browser"
+  value       = module.pdm_env.cloudfront_domain
+}
+
+output "frontend_bucket_name" {
+  description = "S3 bucket holding the built React files"
+  value       = module.pdm_env.frontend_bucket_name
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID (used for cache invalidation in CI)"
+  value       = module.pdm_env.cloudfront_distribution_id
+}

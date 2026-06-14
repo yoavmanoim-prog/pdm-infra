@@ -81,3 +81,41 @@ resource "aws_iam_role_policy_attachment" "github_actions_ecr" {
   role       = aws_iam_role.github_actions.name
   policy_arn = aws_iam_policy.github_actions_ecr.arn
 }
+
+# ==========================================
+# S3 + CloudFront deploy permissions
+# ==========================================
+
+resource "aws_iam_policy" "github_actions_frontend_deploy" {
+  name        = "pdm-github-actions-frontend-deploy"
+  description = "Allows GitHub Actions to deploy the frontend to S3 and invalidate CloudFront"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "arn:aws:s3:::pdm-frontend-*",
+          "arn:aws:s3:::pdm-frontend-*/*"
+        ]
+      },
+      {
+        # list-distributions is needed so CI can look up the distribution ID at runtime
+        Effect   = "Allow"
+        Action   = ["cloudfront:ListDistributions", "cloudfront:CreateInvalidation"]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_frontend_deploy" {
+  role       = aws_iam_role.github_actions.name
+  policy_arn = aws_iam_policy.github_actions_frontend_deploy.arn
+}

@@ -47,3 +47,18 @@ output "external_secrets_role_arn" {
   description = "IAM role ARN for External Secrets Operator — annotate the external-secrets controller ServiceAccount with this"
   value       = aws_iam_role.external_secrets.arn
 }
+
+output "cloudfront_domain" {
+  description = "CloudFront distribution domain — open this URL in your browser"
+  value       = aws_cloudfront_distribution.pdm_frontend.domain_name
+}
+
+output "frontend_bucket_name" {
+  description = "S3 bucket that holds the built React files"
+  value       = aws_s3_bucket.pdm_frontend.bucket
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID — used for cache invalidation in CI"
+  value       = aws_cloudfront_distribution.pdm_frontend.id
+}
