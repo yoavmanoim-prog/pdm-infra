@@ -43,3 +43,8 @@ output "backend_irsa_role_arn" {
   description = "IAM role ARN to annotate the backend ServiceAccount with"
   value       = module.pdm_env.backend_irsa_role_arn
 }
+
+output "external_secrets_role_arn" {
+  description = "IAM role ARN to annotate the external-secrets controller ServiceAccount with"
+  value       = module.pdm_env.external_secrets_role_arn
+}

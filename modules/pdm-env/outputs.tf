@@ -42,3 +42,8 @@ output "rds_endpoint" {
   description = "RDS postgres endpoint — use this in DATABASE_URL"
   value       = aws_db_instance.pdm.endpoint
 }
+
+output "external_secrets_role_arn" {
+  description = "IAM role ARN for External Secrets Operator — annotate the external-secrets controller ServiceAccount with this"
+  value       = aws_iam_role.external_secrets.arn
+}
