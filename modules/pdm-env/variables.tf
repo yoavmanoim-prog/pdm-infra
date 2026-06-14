@@ -25,9 +25,6 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
-variable "db_password" {
-  description = "Master password for the RDS postgres instance"
-  type        = string
-  sensitive   = true # marks it as sensitive so Terraform never prints it in logs
-}
+# The RDS master password is no longer a variable — it is read from the
+# pdm/backend/db-password secret in AWS Secrets Manager (see main.tf).
 

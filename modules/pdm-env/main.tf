@@ -193,6 +193,36 @@ resource "helm_release" "argocd" {
 }
 
 # ==========================================
+# Helm: External Secrets Operator
+# Installs the ESO controller + CRDs. The controller ServiceAccount is annotated
+# with the IRSA role (see aws_iam_role.external_secrets) so it can read pdm/*
+# secrets from Secrets Manager. The ClusterSecretStore and the per-app
+# ExternalSecrets live in gitops / the backend Helm chart.
+# ==========================================
+
+resource "helm_release" "external_secrets" {
+  name             = "external-secrets"
+  repository       = "https://charts.external-secrets.io"
+  chart            = "external-secrets"
+  namespace        = "external-secrets"
+  create_namespace = true
+  # not version-pinned (consistent with the argocd/ingress releases above) —
+  # pin to a known-good chart version once confirmed for reproducible plans.
+
+  values = [yamlencode({
+    installCRDs = true
+    # bind the controller's ServiceAccount to the IRSA role that can read pdm/*
+    serviceAccount = {
+      annotations = {
+        "eks.amazonaws.com/role-arn" = aws_iam_role.external_secrets.arn
+      }
+    }
+  })]
+
+  depends_on = [module.eks]
+}
+
+# ==========================================
 # Helm: kube-prometheus-stack
 # Installs Prometheus, Grafana, and Alertmanager in one chart.
 # Overrides in helm-values/kube-prometheus-stack.yaml configure:
@@ -203,15 +233,24 @@ resource "helm_release" "argocd" {
 
 # Read secrets from AWS Secrets Manager — Terraform accesses these using
 # the OIDC role assumed by CI, so no credentials are ever stored in code.
-# Before running terraform apply, create these two secrets in AWS:
+# Before running terraform apply, create these secrets in AWS:
 #   pdm/grafana/admin-password
 #   pdm/alertmanager/slack-webhook-url
+#   pdm/backend/db-password        (the RDS master password)
 data "aws_secretsmanager_secret_version" "grafana_password" {
   secret_id = "pdm/grafana/admin-password"
 }
 
 data "aws_secretsmanager_secret_version" "slack_webhook_url" {
   secret_id = "pdm/alertmanager/slack-webhook-url"
+}
+
+# The RDS master password. This is the single source of truth: terraform sets the
+# RDS password from here, and External Secrets Operator syncs the same value into
+# the backend's Kubernetes secret — so the password lives only in Secrets Manager,
+# never in git. Rotate by updating this secret, then re-running terraform apply.
+data "aws_secretsmanager_secret_version" "db_password" {
+  secret_id = "pdm/backend/db-password"
 }
 
 resource "helm_release" "prometheus_stack" {
@@ -340,7 +379,7 @@ resource "aws_db_instance" "pdm" {
 
   db_name  = "pdm"
   username = "pdm"
-  password = var.db_password # passed in via tfvars — never hardcoded
+  password = data.aws_secretsmanager_secret_version.db_password.secret_string # from Secrets Manager, never in git
 
   db_subnet_group_name   = aws_db_subnet_group.pdm.name
   vpc_security_group_ids = [aws_security_group.rds.id]
@@ -429,6 +468,54 @@ resource "aws_iam_role_policy" "pdm_backend_s3" {
         aws_s3_bucket.pdm_docs.arn,
         "${aws_s3_bucket.pdm_docs.arn}/*"
       ]
+    }]
+  })
+}
+
+# ==========================================
+# IRSA — External Secrets Operator
+# Lets the ESO controller read pdm/* secrets from Secrets Manager and sync them
+# into Kubernetes Secrets, so the DB password lives only in Secrets Manager.
+# The controller ServiceAccount (external-secrets/external-secrets) is annotated
+# with this role's ARN — see the external_secrets_role_arn output.
+# ==========================================
+
+resource "aws_iam_role" "external_secrets" {
+  name = "pdm-external-secrets-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Federated = module.eks.oidc_provider_arn
+      }
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "${trimprefix(module.eks.cluster_oidc_issuer_url, "https://")}:sub" = "system:serviceaccount:external-secrets:external-secrets"
+          "${trimprefix(module.eks.cluster_oidc_issuer_url, "https://")}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "external_secrets" {
+  name = "pdm-external-secrets-read"
+  role = aws_iam_role.external_secrets.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+      ]
+      # scoped to pdm/* secrets only — the trailing -?????? matches the random
+      # suffix AWS appends to every secret ARN
+      Resource = "arn:aws:secretsmanager:${var.aws_region}:*:secret:pdm/*"
     }]
   })
 }

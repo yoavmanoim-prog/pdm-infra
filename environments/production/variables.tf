@@ -15,9 +15,6 @@ variable "cluster_version" {
   default     = "1.30"
 }
 
-variable "db_password" {
-  description = "Master password for the RDS postgres instance"
-  type        = string
-  sensitive   = true # Terraform will never print this value in logs
-}
+# db_password removed — the RDS master password now lives only in the
+# pdm/backend/db-password secret in AWS Secrets Manager.
 
