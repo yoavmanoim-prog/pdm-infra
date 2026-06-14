@@ -4,6 +4,12 @@ server:
   # Disable TLS so ingress-nginx can terminate it
   extraArgs:
     - --insecure
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    hostname: argocd.52.202.248.204.nip.io
 
 configs:
   params:
