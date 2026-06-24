@@ -5,6 +5,23 @@
 grafana:
   adminPassword: "${grafana_password}"
 
+  # Expose the Grafana UI on a free nip.io domain via the shared nginx ingress.
+  # grafana.<elb-ip>.nip.io resolves to the ingress LoadBalancer; nginx routes by
+  # Host header (same pattern as ArgoCD / staging). HTTP only — no cert needed.
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - grafana.52.202.248.204.nip.io
+    path: /
+    pathType: Prefix
+
+  # tell Grafana its external URL so generated links / redirects are correct
+  grafana.ini:
+    server:
+      domain: grafana.52.202.248.204.nip.io
+      root_url: "http://grafana.52.202.248.204.nip.io"
+
   # Allow Prometheus to discover ServiceMonitor resources in all namespaces,
   # not just the monitoring namespace where the stack itself is installed.
   sidecar:
